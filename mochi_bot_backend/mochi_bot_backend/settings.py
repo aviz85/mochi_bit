@@ -43,18 +43,25 @@ CHATBOT_TYPES = {
             }
         }
     },
-    'claudie': {
-        'name': 'Claudie',
-        'description': 'A chatbot powered by Anthropic AI',
-        'class': 'chatbot.chatbot_types.claudie.chatbot.ClaudieChatbot',
-        'settings': {
-            'character': {
-                'type': 'string',
-                'default': 'You are a helpful AI assistant.',
-                'description': 'The character or system prompt for the chatbot'
-            }
+'claudie': {
+    'name': 'Claudie',
+    'description': 'A chatbot powered by Anthropic AI',
+    'class': 'chatbot.chatbot_types.claudie.chatbot.ClaudieChatbot',
+    'settings': {
+        'character': {
+            'type': 'string',
+            'default': 'You are a helpful AI assistant.',
+            'description': 'The character or system prompt for the chatbot'
+        },
+        'temperature': {
+            'type': 'number',
+            'default': 1.0,
+            'description': 'The temperature setting for the chatbot response, from 0 to 1.',
+            'minimum': 0,
+            'maximum': 1
         }
-    },
+    }
+},
     # Add other chatbot types here
 }
 # Internationalization

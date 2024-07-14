@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TextField, Button, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton } from '@mui/material';
+import { TextField, Button, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Slider, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { getChatbotSettings, updateChatbotSetting, deleteChatbotSetting } from '../services/api';
 
@@ -7,6 +7,7 @@ function ChatbotSettings({ chatbot }) {
   const [settings, setSettings] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [newType, setNewType] = useState('string'); // Default type for new settings
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -25,10 +26,11 @@ function ChatbotSettings({ chatbot }) {
   const handleAddSetting = async () => {
     if (newKey && newValue) {
       try {
-        const newSettings = [...settings, { key: newKey, value: newValue }];
+        const newSettings = [...settings, { key: newKey, value: newValue, type: newType }];
         setSettings(newSettings);
         setNewKey('');
         setNewValue('');
+        setNewType('string');
       } catch (error) {
         console.error('Failed to add setting:', error);
       }
@@ -62,6 +64,46 @@ function ChatbotSettings({ chatbot }) {
     }
   };
 
+  const renderWidget = (setting) => {
+    switch (setting.type) {
+      case 'number':
+        return (
+          <Slider
+            value={Number(setting.value)}
+            onChange={(e, newValue) => handleUpdateSetting(setting.key, newValue)}
+            min={0}
+            max={1}
+            step={0.01}
+            marks
+            valueLabelDisplay="auto"
+          />
+        );
+      case 'select':
+        return (
+          <FormControl fullWidth>
+            <InputLabel>{setting.key}</InputLabel>
+            <Select
+              value={setting.value}
+              onChange={(e) => handleUpdateSetting(setting.key, e.target.value)}
+            >
+              {/* Add MenuItem options here */}
+              <MenuItem value="option1">Option 1</MenuItem>
+              <MenuItem value="option2">Option 2</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      // Add other case statements for different widget types
+      default:
+        return (
+          <TextField
+            value={setting.value}
+            onChange={(e) => handleUpdateSetting(setting.key, e.target.value)}
+            fullWidth
+          />
+        );
+    }
+  };
+
   return (
     <div>
       <Typography variant="h6" gutterBottom>
@@ -72,13 +114,7 @@ function ChatbotSettings({ chatbot }) {
           <ListItem key={setting.key}>
             <ListItemText
               primary={setting.key}
-              secondary={
-                <TextField
-                  value={setting.value}
-                  onChange={(e) => handleUpdateSetting(setting.key, e.target.value)}
-                  fullWidth
-                />
-              }
+              secondary={renderWidget(setting)}
             />
             <ListItemSecondaryAction>
               <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteSetting(setting.key)}>
@@ -105,6 +141,18 @@ function ChatbotSettings({ chatbot }) {
         fullWidth
         margin="normal"
       />
+      <FormControl fullWidth margin="normal">
+        <InputLabel>Type</InputLabel>
+        <Select
+          value={newType}
+          onChange={(e) => setNewType(e.target.value)}
+        >
+          <MenuItem value="string">String</MenuItem>
+          <MenuItem value="number">Number</MenuItem>
+          <MenuItem value="select">Select</MenuItem>
+          {/* Add other options here */}
+        </Select>
+      </FormControl>
       <Button onClick={handleAddSetting} variant="contained" color="primary" style={{ marginTop: '10px' }}>
         Add Setting
       </Button>

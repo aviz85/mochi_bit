@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 from django.conf import settings
-from .factory import ChatbotFactory
 
 class Chatbot(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -39,6 +38,13 @@ class Chatbot(models.Model):
             'visible': self.visible,
             'guest_allowed': self.guest_allowed,
         }
+
+    def get_setting(self, key):
+        return self.settings.get(key, settings.CHATBOT_TYPES[self.chatbot_type]['settings'][key]['default'])
+
+    def set_setting(self, key, value):
+        self.settings[key] = value
+        self.save()
         
 class Thread(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
