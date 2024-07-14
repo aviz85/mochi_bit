@@ -4,6 +4,7 @@ import { getChatbots, createChatbot, getChatbotTypes, deleteChatbot } from '../s
 import ChatbotList from './ChatbotList';
 import ChatWindow from './ChatWindow';
 import ChatbotSettings from './ChatbotSettings';
+import ChatLogs from './ChatLogs';
 import { Container, Grid, Typography, Button, Tabs, Tab } from '@mui/material';
 
 function Dashboard() {
@@ -90,9 +91,11 @@ function Dashboard() {
               <Tabs value={activeTab} onChange={handleTabChange}>
                 <Tab label="Chat" />
                 <Tab label="Settings" />
+                <Tab label="Chat Logs" />
               </Tabs>
               {activeTab === 0 && <ChatWindow chatbot={selectedChatbot} />}
-              {activeTab === 1 && <ChatbotSettings chatbotId={selectedChatbot.id} />} {/* Pass chatbotId */}
+              {activeTab === 1 && <ChatbotSettings chatbotId={selectedChatbot.id} />}
+              {activeTab === 2 && <ChatLogs chatbot={selectedChatbot} />}
             </>
           )}
         </Grid>

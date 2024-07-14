@@ -16,6 +16,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json  # Add this import
 from django.middleware.csrf import get_token
+from django.db.models import Count
 from rest_framework.exceptions import ValidationError
 
 @csrf_exempt
@@ -34,6 +35,26 @@ class ChatbotViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_chat_logs(request, chatbot_id):
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id, owner=request.user)
+    threads = Thread.objects.filter(chatbot=chatbot, visible=True).annotate(
+        message_count=Count('message')
+    ).filter(message_count__gt=0)
+    
+    logs = []
+    for thread in threads:
+        messages = Message.objects.filter(thread=thread).order_by('created_at')
+        thread_data = {
+            'thread_id': thread.id,
+            'created_at': thread.created_at,
+            'messages': MessageSerializer(messages, many=True).data
+        }
+        logs.append(thread_data)
+    
+    return Response(logs)
+     
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def chatbot_settings(request, chatbot_id):

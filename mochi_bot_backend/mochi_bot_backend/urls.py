@@ -20,6 +20,8 @@ urlpatterns = [
     path('api/chatbot/<str:chatbot_id>/documents/', views.get_documents),
     path('api/chatbot/<uuid:chatbot_id>/settings/', views.chatbot_settings),
     path('api/debug/', debug_view, name='debug_view'),
+    path('api/chatbot/<str:chatbot_id>/logs/', views.get_chat_logs),
+    
 ]
 
 if settings.DEBUG:

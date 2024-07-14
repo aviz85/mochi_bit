@@ -119,12 +119,9 @@ export const getDocuments = (chatbotId) =>
 export const getChatLogs = async (chatbotId) => {
   try {
     const response = await api.get(`/chatbot/${chatbotId}/logs/`);
-    return response;
+    return response.data;
   } catch (error) {
-    if (error.response && error.response.status === 404) {
-      // If the endpoint doesn't exist, return an empty array
-      return { data: [] };
-    }
+    console.error('Failed to fetch chat logs:', error);
     throw error;
   }
 };

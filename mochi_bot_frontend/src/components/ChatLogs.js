@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, List, ListItem, ListItemText, Paper, CircularProgress } from '@mui/material';
+import { Typography, List, ListItem, ListItemText, Paper, CircularProgress, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { styled } from '@mui/material/styles';
 import { getChatLogs } from '../services/api';
 
@@ -8,6 +9,10 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   maxHeight: '500px',
   overflow: 'auto',
+}));
+
+const StyledAccordion = styled(Accordion)(({ theme }) => ({
+  marginBottom: theme.spacing(1),
 }));
 
 function ChatLogs({ chatbot }) {
@@ -23,15 +28,11 @@ function ChatLogs({ chatbot }) {
     try {
       setLoading(true);
       setError(null);
-      const response = await getChatLogs(chatbot.id);
-      setLogs(Array.isArray(response.data) ? response.data : []);
+      const data = await getChatLogs(chatbot.id);
+      setLogs(Array.isArray(data) ? data.filter(thread => thread.messages.length > 0) : []);
     } catch (error) {
       console.error('Failed to fetch chat logs:', error);
-      if (error.response && error.response.status === 404) {
-        setError('Chat logs are not available for this chatbot.');
-      } else {
-        setError('Failed to fetch chat logs. Please try again later.');
-      }
+      setError('Failed to fetch chat logs. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -52,16 +53,25 @@ function ChatLogs({ chatbot }) {
       </Typography>
       <StyledPaper>
         {logs.length > 0 ? (
-          <List>
-            {logs.map((log, index) => (
-              <ListItem key={index}>
-                <ListItemText
-                  primary={`${log.role}: ${log.content}`}
-                  secondary={new Date(log.timestamp).toLocaleString()}
-                />
-              </ListItem>
-            ))}
-          </List>
+          logs.map((thread, index) => (
+            <StyledAccordion key={thread.thread_id}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Thread {index + 1} - {new Date(thread.created_at).toLocaleString()} ({thread.messages.length} messages)</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <List>
+                  {thread.messages.map((message, msgIndex) => (
+                    <ListItem key={msgIndex}>
+                      <ListItemText
+                        primary={`${message.role}: ${message.content}`}
+                        secondary={new Date(message.created_at).toLocaleString()}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </AccordionDetails>
+            </StyledAccordion>
+          ))
         ) : (
           <Typography>No chat logs available for this chatbot.</Typography>
         )}
