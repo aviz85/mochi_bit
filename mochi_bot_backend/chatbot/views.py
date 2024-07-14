@@ -1,76 +1,98 @@
 import logging
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
-from .models import User, Chatbot, Thread, Message
+from .models import User, Chatbot, Thread, Message, ChatbotSettingsSchema
 from .serializers import UserSerializer, LoginSerializer, ChatbotSerializer, ThreadSerializer, MessageSerializer
 from .factory import ChatbotFactory
 from .file_handler import save_uploaded_file, delete_file, get_file_url
 logger = logging.getLogger(__name__)
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json  # Add this import
+from django.middleware.csrf import get_token
+from rest_framework.exceptions import ValidationError
 
-@api_view(['GET', 'POST'])
+@csrf_exempt
+def debug_view(request):
+    csrf_token = get_token(request)
+    headers = request.headers
+    print(f"CSRF Token: {csrf_token}")
+    print(f"Headers: {headers}")
+    return JsonResponse({'csrf_token': csrf_token, 'headers': dict(headers)})
+    
+class ChatbotViewSet(viewsets.ModelViewSet):
+    queryset = Chatbot.objects.all()
+    serializer_class = ChatbotSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+@api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def chatbot_settings(request, chatbot_id):
     chatbot = get_object_or_404(Chatbot, id=chatbot_id)
-    
-    if request.method == 'GET':
-        return Response(chatbot.settings)
-    
-    elif request.method == 'POST':
-        new_settings = request.data
-        for key, value in new_settings.items():
-            chatbot.set_setting(key, value)
-        return Response(chatbot.settings)
 
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def chatbot_setting(request, chatbot_id, key):
-    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
-    
-    if request.method == 'GET':
-        value = chatbot.get_setting(key)
-        return Response({key: value})
-    
-    elif request.method == 'PUT':
-        value = request.data.get('value')
-        chatbot.set_setting(key, value)
-        return Response({key: value})
-    
-    elif request.method == 'DELETE':
-        if key in chatbot.settings:
-            del chatbot.settings[key]
-            chatbot.save()
-        return Response(status=204)
+    # Debugging prints
+    print(f"Request user: {request.user}")
+    print(f"Chatbot owner: {chatbot.owner}")
+    print(f"Is admin: {request.user.is_staff}")
+    print(f"Request headers: {request.headers}")
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def send_message(request, chatbot_id, thread_id):
-    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
-    thread = get_object_or_404(Thread, id=thread_id)
-    
-    user_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'user', 'content': request.data['content']})
-    if user_message_serializer.is_valid():
-        user_message = user_message_serializer.save()
-    else:
-        return Response(user_message_serializer.errors, status=400)
-    
-    response = chatbot.generate_response(request.data['content'], thread_id)
-    
-    assistant_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'assistant', 'content': response})
-    if assistant_message_serializer.is_valid():
-        assistant_message = assistant_message_serializer.save()
-    else:
-        return Response(assistant_message_serializer.errors, status=400)
+    # Check if the request user is the owner of the chatbot or an admin
+    if not (request.user == chatbot.owner or request.user.is_staff):
+        return Response({'error': 'Permission denied'}, status=403)
 
-    return Response({
-        'user_message': MessageSerializer(user_message).data,
-        'assistant_message': MessageSerializer(assistant_message).data
-    }, status=200)
+    schema = ChatbotSettingsSchema.objects.get(chatbot_type=chatbot.chatbot_type)
 
+    if request.method == "GET":
+        settings = {}
+        for key, setting_schema in schema.schema.items():
+            setting_value = chatbot.settings.get(key, setting_schema['default'])
+            settings[key] = {
+                'value': setting_value,
+                'display_name': setting_schema.get('display_name', key),
+                'description': setting_schema.get('description', ''),
+                'type': setting_schema['type'],
+                'default_value': setting_schema['default'],
+                'required': setting_schema.get('required', False)
+            }
+        return Response(settings)
+
+    elif request.method == "PUT":
+        try:
+            settings_data = json.loads(request.body)
+            for key, value in settings_data.items():
+                if key not in schema.schema:
+                    raise ValidationError(f"Invalid setting: {key}")
+                schema.validate_setting(key, value)
+                chatbot.settings[key] = value
+            chatbot.save()  # Save the updated settings
+            
+            # Return the full updated settings
+            updated_settings = {}
+            for key, setting_schema in schema.schema.items():
+                setting_value = chatbot.settings.get(key, setting_schema['default'])
+                updated_settings[key] = {
+                    'value': setting_value,
+                    'display_name': setting_schema.get('display_name', key),
+                    'description': setting_schema.get('description', ''),
+                    'type': setting_schema['type'],
+                    'default_value': setting_schema['default'],
+                    'required': setting_schema.get('required', False)
+                }
+            return Response(updated_settings)
+        except json.JSONDecodeError:
+            return Response({'error': 'Invalid JSON'}, status=400)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+            
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -110,6 +132,8 @@ def logout_user(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def chatbot_list(request):
+    print(f"Request user: {request.user}")
+
     if request.method == 'GET':
         chatbots = Chatbot.objects.filter(owner=request.user)
         serializer = ChatbotSerializer(chatbots, many=True)
@@ -169,6 +193,8 @@ def chatbot_detail(request, chatbot_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_thread(request):
+    print(f"Request user: {request.user}")
+
     logger.info(f"Received data for thread creation: {request.data}")
     
     chatbot_id = request.data.get('chatbot')

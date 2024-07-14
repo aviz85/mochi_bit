@@ -92,7 +92,7 @@ function Dashboard() {
                 <Tab label="Settings" />
               </Tabs>
               {activeTab === 0 && <ChatWindow chatbot={selectedChatbot} />}
-              {activeTab === 1 && <ChatbotSettings chatbot={selectedChatbot} />}
+              {activeTab === 1 && <ChatbotSettings chatbotId={selectedChatbot.id} />} {/* Pass chatbotId */}
             </>
           )}
         </Grid>

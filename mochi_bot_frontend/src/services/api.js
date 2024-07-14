@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -11,11 +12,45 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  const csrfToken = Cookies.get('csrftoken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
   return config;
 });
+
+export const getChatbotSettings = async (chatbotId) => {
+  console.log('Fetching settings for chatbotId:', chatbotId);
+  try {
+    const response = await api.get(`/chatbot/${chatbotId}/settings/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching chatbot settings:', error);
+    throw error;
+  }
+};
+
+export const updateChatbotSettings = async (chatbotId, settings) => {
+  try {
+    const response = await api.put(`/chatbot/${chatbotId}/settings/`, settings);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating chatbot settings:', error);
+    throw error;
+  }
+};
+
+export const debugRequest = async () => {
+  try {
+    const response = await api.get('/debug/', { withCredentials: true });
+    console.log('Debug Response:', response.data);
+  } catch (error) {
+    console.error('Debug Request Error:', error.response?.data || error.message);
+  }
+};
 
 export const register = (username, email, password) => 
   api.post('/register/', { username, email, password });
@@ -93,12 +128,3 @@ export const getChatLogs = async (chatbotId) => {
     throw error;
   }
 };
-
-export const getChatbotSettings = (chatbotId) => 
-  api.get(`/chatbot/${chatbotId}/settings/`);
-
-export const updateChatbotSetting = (chatbotId, key, value) => 
-  api.put(`/chatbot/${chatbotId}/setting/${key}/`, { value });
-
-export const deleteChatbotSetting = (chatbotId, key) => 
-  api.delete(`/chatbot/${chatbotId}/setting/${key}/`);

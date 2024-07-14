@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from chatbot import views
+from chatbot.views import debug_view  # Ensure this import is here
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -17,8 +18,8 @@ urlpatterns = [
     path('api/chatbot/<str:chatbot_id>/upload_document/', views.upload_document),
     path('api/chatbot/<str:chatbot_id>/delete_document/<str:document_name>/', views.delete_document),
     path('api/chatbot/<str:chatbot_id>/documents/', views.get_documents),
-    path('api/chatbot/<str:chatbot_id>/settings/', views.chatbot_settings),
-    path('api/chatbot/<str:chatbot_id>/setting/<str:key>/', views.chatbot_setting)
+    path('api/chatbot/<uuid:chatbot_id>/settings/', views.chatbot_settings),
+    path('api/debug/', debug_view, name='debug_view'),
 ]
 
 if settings.DEBUG:
