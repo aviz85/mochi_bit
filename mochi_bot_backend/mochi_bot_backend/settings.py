@@ -43,9 +43,20 @@ CHATBOT_TYPES = {
             }
         }
     },
+    'claudie': {
+        'name': 'Claudie',
+        'description': 'A chatbot powered by Anthropic AI',
+        'class': 'chatbot.chatbot_types.claudie.chatbot.ClaudieChatbot',
+        'settings': {
+            'character': {
+                'type': 'string',
+                'default': 'You are a helpful AI assistant.',
+                'description': 'The character or system prompt for the chatbot'
+            }
+        }
+    },
     # Add other chatbot types here
 }
-
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
