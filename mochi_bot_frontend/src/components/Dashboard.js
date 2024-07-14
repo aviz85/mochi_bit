@@ -1,6 +1,8 @@
+// File: src/components/Dashboard.js
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getChatbots, createChatbot, getChatbotTypes } from '../services/api';
+import { getChatbots, createChatbot, deleteChatbot, getChatbotTypes } from '../services/api';
 import ChatbotList from './ChatbotList';
 import ChatWindow from './ChatWindow';
 import { Container, Grid, Typography, Button } from '@mui/material';
@@ -43,6 +45,16 @@ function Dashboard() {
     }
   };
 
+  const handleDeleteChatbot = async (id) => {
+    try {
+      await deleteChatbot(id);
+      setChatbots(chatbots.filter(chatbot => chatbot.id !== id));
+      setSelectedChatbot(null);
+    } catch (error) {
+      console.error('Failed to delete chatbot:', error);
+    }
+  };
+
   const handleLogout = () => {
     logout();
   };
@@ -62,6 +74,7 @@ function Dashboard() {
             chatbotTypes={chatbotTypes}
             onCreateChatbot={handleCreateChatbot}
             onSelectChatbot={setSelectedChatbot}
+            onDeleteChatbot={handleDeleteChatbot} // Pass the onDeleteChatbot function
           />
         </Grid>
         <Grid item xs={12} md={8}>

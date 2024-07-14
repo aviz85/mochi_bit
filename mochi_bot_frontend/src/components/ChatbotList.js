@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { List, ListItem, ListItemText, Button, TextField, Select, MenuItem, Typography } from '@mui/material';
+import { List, ListItem, ListItemText, Button, TextField, Select, MenuItem, Typography, IconButton } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-function ChatbotList({ chatbots, chatbotTypes, onCreateChatbot, onSelectChatbot }) {
+function ChatbotList({ chatbots, chatbotTypes, onCreateChatbot, onSelectChatbot, onDeleteChatbot }) {
   const [newChatbotName, setNewChatbotName] = useState('');
   const [newChatbotType, setNewChatbotType] = useState('');
 
@@ -22,6 +23,9 @@ function ChatbotList({ chatbots, chatbotTypes, onCreateChatbot, onSelectChatbot 
         {chatbots.map((chatbot) => (
           <ListItem button key={chatbot.id} onClick={() => onSelectChatbot(chatbot)}>
             <ListItemText primary={chatbot.name} secondary={chatbot.chatbot_type} />
+            <IconButton edge="end" aria-label="delete" onClick={() => onDeleteChatbot(chatbot.id)}>
+              <DeleteIcon />
+            </IconButton>
           </ListItem>
         ))}
       </List>

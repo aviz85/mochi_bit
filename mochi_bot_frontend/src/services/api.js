@@ -39,6 +39,8 @@ export const getChatbots = () => api.get('/chatbot/');
 export const createChatbot = (name, chatbot_type, desc = '') =>
   api.post('/chatbot/', { name, chatbot_type, desc });
 
+export const deleteChatbot = (id) => api.delete(`/chatbot/${id}/`); // Add the deleteChatbot function
+
 export const getChatbotTypes = () => api.get('/chatbot_types/');
 
 export const createThread = async (chatbotId) => {
