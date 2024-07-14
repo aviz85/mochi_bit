@@ -1,16 +1,16 @@
-// File: src/components/Dashboard.js
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getChatbots, createChatbot, deleteChatbot, getChatbotTypes } from '../services/api';
+import { getChatbots, createChatbot, getChatbotTypes, deleteChatbot } from '../services/api';
 import ChatbotList from './ChatbotList';
 import ChatWindow from './ChatWindow';
-import { Container, Grid, Typography, Button } from '@mui/material';
+import ChatbotSettings from './ChatbotSettings';
+import { Container, Grid, Typography, Button, Tabs, Tab } from '@mui/material';
 
 function Dashboard() {
   const [chatbots, setChatbots] = useState([]);
   const [chatbotTypes, setChatbotTypes] = useState([]);
   const [selectedChatbot, setSelectedChatbot] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -49,7 +49,10 @@ function Dashboard() {
     try {
       await deleteChatbot(id);
       setChatbots(chatbots.filter(chatbot => chatbot.id !== id));
-      setSelectedChatbot(null);
+      if (selectedChatbot && selectedChatbot.id === id) {
+        setSelectedChatbot(null);
+        setActiveTab(0);
+      }
     } catch (error) {
       console.error('Failed to delete chatbot:', error);
     }
@@ -57,6 +60,10 @@ function Dashboard() {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
   };
 
   return (
@@ -74,11 +81,20 @@ function Dashboard() {
             chatbotTypes={chatbotTypes}
             onCreateChatbot={handleCreateChatbot}
             onSelectChatbot={setSelectedChatbot}
-            onDeleteChatbot={handleDeleteChatbot} // Pass the onDeleteChatbot function
+            onDeleteChatbot={handleDeleteChatbot}
           />
         </Grid>
         <Grid item xs={12} md={8}>
-          {selectedChatbot && <ChatWindow chatbot={selectedChatbot} />}
+          {selectedChatbot && (
+            <>
+              <Tabs value={activeTab} onChange={handleTabChange}>
+                <Tab label="Chat" />
+                <Tab label="Settings" />
+              </Tabs>
+              {activeTab === 0 && <ChatWindow chatbot={selectedChatbot} />}
+              {activeTab === 1 && <ChatbotSettings chatbot={selectedChatbot} />}
+            </>
+          )}
         </Grid>
       </Grid>
     </Container>

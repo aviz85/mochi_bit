@@ -23,7 +23,7 @@ function ChatbotList({ chatbots, chatbotTypes, onCreateChatbot, onSelectChatbot,
         {chatbots.map((chatbot) => (
           <ListItem button key={chatbot.id} onClick={() => onSelectChatbot(chatbot)}>
             <ListItemText primary={chatbot.name} secondary={chatbot.chatbot_type} />
-            <IconButton edge="end" aria-label="delete" onClick={() => onDeleteChatbot(chatbot.id)}>
+            <IconButton edge="end" aria-label="delete" onClick={(e) => { e.stopPropagation(); onDeleteChatbot(chatbot.id); }}>
               <DeleteIcon />
             </IconButton>
           </ListItem>

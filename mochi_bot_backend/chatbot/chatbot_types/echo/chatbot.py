@@ -1,4 +1,4 @@
-from ..base import BaseChatbot
+from ...chatbot_types.base import BaseChatbot
 
 class EchoChatbot(BaseChatbot):
     def generate_response(self, message_content: str, thread_id: str) -> str:

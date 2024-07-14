@@ -6,59 +6,71 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
-from .models import Chatbot, Thread, Message
+from .models import User, Chatbot, Thread, Message
 from .serializers import UserSerializer, LoginSerializer, ChatbotSerializer, ThreadSerializer, MessageSerializer
 from .factory import ChatbotFactory
 from .file_handler import save_uploaded_file, delete_file, get_file_url
-
 logger = logging.getLogger(__name__)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def chatbot_settings(request, chatbot_id):
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
+    
+    if request.method == 'GET':
+        return Response(chatbot.settings)
+    
+    elif request.method == 'POST':
+        new_settings = request.data
+        for key, value in new_settings.items():
+            chatbot.set_setting(key, value)
+        return Response(chatbot.settings)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def chatbot_setting(request, chatbot_id, key):
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
+    
+    if request.method == 'GET':
+        value = chatbot.get_setting(key)
+        return Response({key: value})
+    
+    elif request.method == 'PUT':
+        value = request.data.get('value')
+        chatbot.set_setting(key, value)
+        return Response({key: value})
+    
+    elif request.method == 'DELETE':
+        if key in chatbot.settings:
+            del chatbot.settings[key]
+            chatbot.save()
+        return Response(status=204)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_message(request, chatbot_id, thread_id):
-    logger.info(f"send_message called with chatbot_id={chatbot_id} and thread_id={thread_id}")
-
     chatbot = get_object_or_404(Chatbot, id=chatbot_id)
     thread = get_object_or_404(Thread, id=thread_id)
-
-    # Save user message
-    user_message_data = {
-        'thread': thread.id,
-        'role': 'user',
-        'content': request.data['content']
-    }
-    user_message_serializer = MessageSerializer(data=user_message_data)
+    
+    user_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'user', 'content': request.data['content']})
     if user_message_serializer.is_valid():
         user_message = user_message_serializer.save()
-        logger.info(f"User message saved successfully: {user_message.id}")
     else:
-        logger.error(f"User message save failed: {user_message_serializer.errors}")
-        return Response(user_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # Generate assistant response
+        return Response(user_message_serializer.errors, status=400)
+    
     response = chatbot.generate_response(request.data['content'], thread_id)
-    logger.info(f"Chatbot response generated: {response}")
-
-    # Save assistant message
-    assistant_message_data = {
-        'thread': thread.id,
-        'role': 'assistant',
-        'content': response
-    }
-    assistant_message_serializer = MessageSerializer(data=assistant_message_data)
+    
+    assistant_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'assistant', 'content': response})
     if assistant_message_serializer.is_valid():
         assistant_message = assistant_message_serializer.save()
-        logger.info(f"Assistant message saved successfully: {assistant_message.id}")
     else:
-        logger.error(f"Assistant message save failed: {assistant_message_serializer.errors}")
-        return Response(assistant_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(assistant_message_serializer.errors, status=400)
 
     return Response({
-        'thread': ThreadSerializer(thread).data,
         'user_message': MessageSerializer(user_message).data,
         'assistant_message': MessageSerializer(assistant_message).data
-    }, status=status.HTTP_200_OK)
-    
+    }, status=200)
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -110,20 +122,32 @@ def chatbot_list(request):
         
         try:
             chatbot_metadata = ChatbotFactory.get_chatbot_metadata(chatbot_type)
+            logger.info(f"Chatbot metadata for type {chatbot_type}: {chatbot_metadata}")
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Ensure 'settings' exists in chatbot_metadata
+        settings = chatbot_metadata.get('settings')
+        if settings is None:
+            return Response({'error': 'Invalid chatbot metadata: missing settings'}, status=status.HTTP_400_BAD_REQUEST)
+        
         serializer = ChatbotSerializer(data=request.data)
         if serializer.is_valid():
-            settings = {k: v['default'] for k, v in chatbot_metadata['settings_schema'].items()}
-            if 'settings' in request.data:
-                settings.update(request.data['settings'])
+            # Initialize settings with default values
+            initialized_settings = {k: v.get('default', '') for k, v in settings.items()}
+            logger.info(f"Initial settings: {initialized_settings}")
             
-            chatbot = serializer.save(owner=request.user, chatbot_type=chatbot_type, settings=settings)
+            # Update settings with provided values if any
+            if 'settings' in request.data:
+                initialized_settings.update(request.data['settings'])
+                logger.info(f"Updated settings: {initialized_settings}")
+            
+            chatbot = serializer.save(owner=request.user, chatbot_type=chatbot_type, settings=initialized_settings)
             return Response(ChatbotSerializer(chatbot).data, status=status.HTTP_201_CREATED)
         
+        logger.error(f"Chatbot creation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def chatbot_detail(request, chatbot_id):

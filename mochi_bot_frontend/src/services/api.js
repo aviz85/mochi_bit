@@ -39,7 +39,7 @@ export const getChatbots = () => api.get('/chatbot/');
 export const createChatbot = (name, chatbot_type, desc = '') =>
   api.post('/chatbot/', { name, chatbot_type, desc });
 
-export const deleteChatbot = (id) => api.delete(`/chatbot/${id}/`); // Add the deleteChatbot function
+export const deleteChatbot = (id) => api.delete(`/chatbot/${id}/`);
 
 export const getChatbotTypes = () => api.get('/chatbot_types/');
 
@@ -80,3 +80,25 @@ export const deleteDocument = (chatbot_id, document_name) =>
 
 export const getDocuments = (chatbot_id) =>
   api.get(`/chatbot/${chatbot_id}/documents/`);
+
+export const getChatLogs = async (chatbot_id) => {
+  try {
+    const response = await api.get(`/chatbot/${chatbot_id}/logs/`);
+    return response;
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      // If the endpoint doesn't exist, return an empty array
+      return { data: [] };
+    }
+    throw error;
+  }
+};
+
+export const getChatbotSettings = (chatbotId) =>
+  api.get(`/chatbot/${chatbotId}/settings/`);
+
+export const updateChatbotSetting = (chatbotId, key, value) =>
+  api.put(`/chatbot/${chatbotId}/setting/${key}/`, { value });
+
+export const deleteChatbotSetting = (chatbotId, key) =>
+  api.delete(`/chatbot/${chatbotId}/setting/${key}/`);

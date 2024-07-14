@@ -1,12 +1,13 @@
 {
-    "name": "Echo",
     "type": "echo",
-    "description": "A simple chatbot that echoes back the user's message",
-    "settings_schema": {
-        "echo_prefix": {
+    "name": "Echo",
+    "description": "A simple chatbot that echoes messages",
+    "settings": [
+        {
+            "key": "echo_prefix",
             "type": "string",
             "default": "Echo: ",
             "description": "Prefix to add before echoing the message"
         }
-    }
+    ]
 }

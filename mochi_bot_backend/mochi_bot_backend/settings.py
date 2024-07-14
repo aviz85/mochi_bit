@@ -30,6 +30,22 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CHATBOT_TYPES = {
+    'echo': {
+        'name': 'Echo',
+        'description': 'A simple chatbot that echoes messages',
+        'class': 'chatbot.chatbot_types.echo.chatbot.EchoChatbot',
+        'settings': {
+            'echo_prefix': {
+                'type': 'string',
+                'default': 'Echo: ',
+                'description': 'Prefix to add before echoing the message'
+            }
+        }
+    },
+    # Add other chatbot types here
+}
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
