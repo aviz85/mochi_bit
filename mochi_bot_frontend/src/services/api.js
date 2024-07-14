@@ -24,8 +24,8 @@ export const login = async (username, password) => {
   try {
     console.log('Sending login request:', { username, password });
     const response = await api.post('/login/', { username, password });
-    console.log('Login response:', response.data); // Log the response to check its structure
-    return response.data; // Ensure the response data is returned
+    console.log('Login response:', response.data);
+    return response.data;
   } catch (error) {
     console.error('Login failed:', error.response);
     throw error;
@@ -41,11 +41,29 @@ export const createChatbot = (name, chatbot_type, desc = '') =>
 
 export const getChatbotTypes = () => api.get('/chatbot_types/');
 
-export const createThread = (chatbot_id) =>
-  api.post('/thread/', { chatbot_id });
+export const createThread = async (chatbotId) => {
+  try {
+    console.log('Creating thread for chatbot:', chatbotId);
+    const response = await api.post('/thread/', { chatbot: chatbotId });
+    console.log('Thread created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to create thread:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
-export const sendMessage = (chatbot_id, thread_id, content) =>
-  api.post(`/chatbot/${chatbot_id}/${thread_id}/chat/`, { content });
+export const sendMessage = async (chatbot_id, thread_id, content) => {
+  try {
+    console.log('Sending message:', { chatbot_id, thread_id, content });
+    const response = await api.post(`/chatbot/${chatbot_id}/${thread_id}/chat/`, { content });
+    console.log('sendMessage response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('sendMessage error:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
 export const uploadDocument = (chatbot_id, file) => {
   const formData = new FormData();

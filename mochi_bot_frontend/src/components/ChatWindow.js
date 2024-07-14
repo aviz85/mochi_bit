@@ -1,19 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createThread, sendMessage } from '../services/api';
-import { TextField, Button, Typography, Paper } from '@mui/material';
+import { TextField, Button, Typography, Paper, CircularProgress, Snackbar } from '@mui/material';
 
 function ChatWindow({ chatbot }) {
   const [thread, setThread] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const createNewThread = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await createThread(chatbot.id);
-      setThread(response.data);
+      console.log('New thread created:', response);
+      setThread(response);
       setMessages([]);
     } catch (error) {
       console.error('Failed to create thread:', error);
+      setError('Failed to create a new thread. Please try again.');
+    } finally {
+      setLoading(false);
     }
   }, [chatbot.id]);
 
@@ -21,17 +29,52 @@ function ChatWindow({ chatbot }) {
     createNewThread();
   }, [createNewThread]);
 
-  const handleSendMessage = async () => {
-    if (input.trim() && thread) {
-      try {
-        const response = await sendMessage(chatbot.id, thread.id, input);
-        setMessages([...messages, response.data.user_message, response.data.assistant_message]);
-        setInput('');
-      } catch (error) {
-        console.error('Failed to send message:', error);
-      }
+const handleSendMessage = async () => {
+  if (input.trim() && thread) {
+    const tempMessage = {
+      content: input,
+      timestamp: new Date().toISOString(),
+      role: 'user',
+      temporary: true,
+    };
+    setMessages((prevMessages) => {
+      const updatedMessages = [...prevMessages, tempMessage];
+      console.log('Temporary messages:', updatedMessages);
+      return updatedMessages;
+    });
+    setInput('');
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await sendMessage(chatbot.id, thread.id, input);
+      console.log('Message sent, response received:', response);
+      setMessages((prevMessages) => {
+        const newMessages = [
+          ...prevMessages.filter((msg) => !msg.temporary),
+          response.user_message,
+          response.assistant_message,
+        ].filter(Boolean);
+        console.log('Updated messages after API response:', newMessages);
+        return newMessages;
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setError('Failed to send message. Please try again.');
+      setMessages((prevMessages) => {
+        const newMessages = prevMessages.filter((msg) => !msg.temporary);
+        console.log('Messages after error:', newMessages);
+        return newMessages;
+      });
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+};
+
+  useEffect(() => {
+    console.log('Messages state updated:', messages);
+  }, [messages]);
 
   return (
     <div>
@@ -39,11 +82,17 @@ function ChatWindow({ chatbot }) {
         Chat with {chatbot.name}
       </Typography>
       <Paper style={{ height: '400px', overflowY: 'scroll', padding: '10px', marginBottom: '10px' }}>
-        {messages.map((message, index) => (
-          <div key={index} style={{ marginBottom: '10px' }}>
-            <strong>{message.role}:</strong> {message.content}
-          </div>
-        ))}
+        {messages.length === 0 ? (
+          <Typography color="textSecondary">No messages yet</Typography>
+        ) : (
+          messages.map((message, index) => (
+            message && message.role && (
+              <div key={index} style={{ marginBottom: '10px', padding: '5px', backgroundColor: message.role === 'user' ? '#e6f7ff' : '#f0f0f0', borderRadius: '5px' }}>
+                <strong>{message.role === 'user' ? 'You' : 'Bot'}:</strong> {message.content}
+              </div>
+            )
+          ))
+        )}
       </Paper>
       <TextField
         value={input}
@@ -51,13 +100,34 @@ function ChatWindow({ chatbot }) {
         fullWidth
         variant="outlined"
         placeholder="Type your message..."
+        disabled={loading || !thread}
       />
-      <Button onClick={handleSendMessage} variant="contained" color="primary" fullWidth style={{ marginTop: '10px' }}>
-        Send
+      <Button 
+        onClick={handleSendMessage} 
+        variant="contained" 
+        color="primary" 
+        fullWidth 
+        style={{ marginTop: '10px' }}
+        disabled={loading || !thread || !input.trim()}
+      >
+        {loading ? <CircularProgress size={24} /> : 'Send'}
       </Button>
-      <Button onClick={createNewThread} variant="outlined" color="secondary" fullWidth style={{ marginTop: '10px' }}>
-        New Thread
+      <Button 
+        onClick={createNewThread} 
+        variant="outlined" 
+        color="secondary" 
+        fullWidth 
+        style={{ marginTop: '10px' }}
+        disabled={loading}
+      >
+        {loading ? <CircularProgress size={24} /> : 'New Thread'}
       </Button>
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        message={error}
+      />
     </div>
   );
 }

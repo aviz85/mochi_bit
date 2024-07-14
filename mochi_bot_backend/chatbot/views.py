@@ -1,36 +1,76 @@
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.contrib.auth import authenticate
+import logging
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-import json
-from .storage import JSONFileStorage
-from .models import User, Chatbot, Thread, Message, UserRole
+from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
+from .models import Chatbot, Thread, Message
+from .serializers import UserSerializer, LoginSerializer, ChatbotSerializer, ThreadSerializer, MessageSerializer
 from .factory import ChatbotFactory
 from .file_handler import save_uploaded_file, delete_file, get_file_url
-from .serializers import UserSerializer, LoginSerializer
 
-storage = JSONFileStorage('db.json')
+logger = logging.getLogger(__name__)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_message(request, chatbot_id, thread_id):
+    logger.info(f"send_message called with chatbot_id={chatbot_id} and thread_id={thread_id}")
+
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
+    thread = get_object_or_404(Thread, id=thread_id)
+
+    # Save user message
+    user_message_data = {
+        'thread': thread.id,
+        'role': 'user',
+        'content': request.data['content']
+    }
+    user_message_serializer = MessageSerializer(data=user_message_data)
+    if user_message_serializer.is_valid():
+        user_message = user_message_serializer.save()
+        logger.info(f"User message saved successfully: {user_message.id}")
+    else:
+        logger.error(f"User message save failed: {user_message_serializer.errors}")
+        return Response(user_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Generate assistant response
+    response = chatbot.generate_response(request.data['content'], thread_id)
+    logger.info(f"Chatbot response generated: {response}")
+
+    # Save assistant message
+    assistant_message_data = {
+        'thread': thread.id,
+        'role': 'assistant',
+        'content': response
+    }
+    assistant_message_serializer = MessageSerializer(data=assistant_message_data)
+    if assistant_message_serializer.is_valid():
+        assistant_message = assistant_message_serializer.save()
+        logger.info(f"Assistant message saved successfully: {assistant_message.id}")
+    else:
+        logger.error(f"Assistant message save failed: {assistant_message_serializer.errors}")
+        return Response(assistant_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({
+        'thread': ThreadSerializer(thread).data,
+        'user_message': MessageSerializer(user_message).data,
+        'assistant_message': MessageSerializer(assistant_message).data
+    }, status=status.HTTP_200_OK)
+    
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
-    data = json.loads(request.body)
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    display_name = data.get('display_name', username)
-    role = UserRole.USER
-
-    if User.objects.filter(username=username).exists():
-        return JsonResponse({'error': 'Username already exists'}, status=400)
-
-    user = User.objects.create_user(username=username, email=email, password=password, display_name=display_name, role=role)
-    user.save()
-
-    return JsonResponse(UserSerializer(user).data, status=201)
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+        user = User.objects.create_user(
+            username=serializer.validated_data['username'],
+            email=serializer.validated_data['email'],
+            password=request.data['password']
+        )
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -39,118 +79,135 @@ def login_user(request):
     if serializer.is_valid():
         user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)
-        return JsonResponse({
+        return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
             'user': UserSerializer(user).data
         })
-    return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_user(request):
-    request.auth.delete()
-    return JsonResponse({}, status=200)
+    try:
+        request.user.auth_token.delete()
+    except (AttributeError, User.auth_token.RelatedObjectDoesNotExist):
+        pass
+    return Response({"success": "Successfully logged out."}, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def chatbot_list(request):
     if request.method == 'GET':
-        chatbots = Chatbot.objects.all()
-        return JsonResponse([chatbot.to_dict() for chatbot in chatbots], safe=False)
+        chatbots = Chatbot.objects.filter(owner=request.user)
+        serializer = ChatbotSerializer(chatbots, many=True)
+        return Response(serializer.data)
+    
     elif request.method == 'POST':
-        data = json.loads(request.body)
-        chatbot_type = data['chatbot_type']
+        chatbot_type = request.data.get('chatbot_type')
+        if not chatbot_type:
+            return Response({'error': 'Chatbot type is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            metadata = ChatbotFactory.get_chatbot_metadata(chatbot_type)
+            chatbot_metadata = ChatbotFactory.get_chatbot_metadata(chatbot_type)
         except ValueError as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
-        chatbot = Chatbot(
-            name=data['name'],
-            desc=data.get('desc', ''),
-            owner=request.user,
-            chatbot_type=chatbot_type
-        )
-        chatbot.settings = {k: v['default'] for k, v in metadata['settings_schema'].items()}
-        chatbot.save()
-
-        return JsonResponse(chatbot.to_dict(), status=201)
+        serializer = ChatbotSerializer(data=request.data)
+        if serializer.is_valid():
+            settings = {k: v['default'] for k, v in chatbot_metadata['settings_schema'].items()}
+            if 'settings' in request.data:
+                settings.update(request.data['settings'])
+            
+            chatbot = serializer.save(owner=request.user, chatbot_type=chatbot_type, settings=settings)
+            return Response(ChatbotSerializer(chatbot).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def chatbot_detail(request, chatbot_id):
-    try:
-        chatbot = Chatbot.objects.get(id=chatbot_id)
-    except Chatbot.DoesNotExist:
-        return JsonResponse({'error': 'Chatbot not found'}, status=404)
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id, owner=request.user)
 
     if request.method == 'GET':
-        return JsonResponse(chatbot.to_dict())
+        serializer = ChatbotSerializer(chatbot)
+        return Response(serializer.data)
     elif request.method == 'PUT':
-        data = json.loads(request.body)
-        chatbot.name = data.get('name', chatbot.name)
-        chatbot.desc = data.get('desc', chatbot.desc)
-        chatbot.settings = data.get('settings', chatbot.settings)
-        chatbot.save()
-        return JsonResponse(chatbot.to_dict())
+        serializer = ChatbotSerializer(chatbot, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     elif request.method == 'DELETE':
         chatbot.delete()
-        return JsonResponse({}, status=204)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_thread(request):
-    data = json.loads(request.body)
-    thread = Thread(
-        chatbot_id=data['chatbot_id'],
-        owner_id=request.user.id
-    )
-    thread.save()
-    return JsonResponse(thread.to_dict(), status=201)
+    logger.info(f"Received data for thread creation: {request.data}")
+    
+    chatbot_id = request.data.get('chatbot')
+    if not chatbot_id:
+        logger.error("No chatbot ID provided")
+        return Response({'error': 'Chatbot ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+    try:
+        chatbot = Chatbot.objects.get(id=chatbot_id, owner=request.user)
+    except Chatbot.DoesNotExist:
+        logger.error(f"Chatbot with id {chatbot_id} not found or doesn't belong to the user")
+        return Response({'error': 'Invalid chatbot ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = ThreadSerializer(data={'chatbot': chatbot.id}, context={'request': request})
+    if serializer.is_valid():
+        thread = serializer.save(owner=request.user)
+        logger.info(f"Thread created successfully: {thread.id}")
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    logger.error(f"Thread creation failed. Errors: {serializer.errors}")
+    return Response({
+        'error': 'Invalid data',
+        'details': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_message(request, chatbot_id, thread_id):
-    data = json.loads(request.body)
-    content = data['content']
-
-    try:
-        chatbot = Chatbot.objects.get(id=chatbot_id)
-        thread = Thread.objects.get(id=thread_id)
-    except (Chatbot.DoesNotExist, Thread.DoesNotExist):
-        return JsonResponse({'error': 'Invalid chatbot or thread'}, status=404)
-
-    user_message = Message(thread=thread, role='user', content=content)
-    user_message.save()
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
+    thread = get_object_or_404(Thread, id=thread_id)
     
-    response = chatbot.generate_response(content, thread_id)
+    user_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'user', 'content': request.data['content']})
+    if user_message_serializer.is_valid():
+        user_message = user_message_serializer.save()
+    else:
+        return Response(user_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    assistant_message = Message(thread=thread, role='assistant', content=response)
-    assistant_message.save()
+    response = chatbot.generate_response(request.data['content'], thread_id)
+    
+    assistant_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'assistant', 'content': response})
+    if assistant_message_serializer.is_valid():
+        assistant_message = assistant_message_serializer.save()
+    else:
+        return Response(assistant_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    return JsonResponse({
-        'user_message': user_message.to_dict(),
-        'assistant_message': assistant_message.to_dict()
-    }, status=200)
+    return Response({
+        'user_message': MessageSerializer(user_message).data,
+        'assistant_message': MessageSerializer(assistant_message).data
+    }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_chatbot_types(request):
     chatbot_types = ChatbotFactory.get_all_chatbot_types()
-    return JsonResponse(chatbot_types, safe=False)
+    return Response(chatbot_types)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_document(request, chatbot_id):
-    try:
-        chatbot = Chatbot.objects.get(id=chatbot_id)
-    except Chatbot.DoesNotExist:
-        return JsonResponse({'error': 'Chatbot not found'}, status=404)
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id, owner=request.user)
 
     if 'file' not in request.FILES:
-        return JsonResponse({'error': 'No file part'}, status=400)
+        return Response({'error': 'No file part'}, status=status.HTTP_400_BAD_REQUEST)
     
     file = request.FILES['file']
     file_path = save_uploaded_file(file)
@@ -163,17 +220,14 @@ def upload_document(request, chatbot_id):
             'path': file_path
         })
         chatbot.save()
-        return JsonResponse({'message': 'File uploaded successfully', 'file_path': file_path})
+        return Response({'message': 'File uploaded successfully', 'file_path': file_path})
     else:
-        return JsonResponse({'error': 'File upload failed'}, status=400)
+        return Response({'error': 'File upload failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_document(request, chatbot_id, document_name):
-    try:
-        chatbot = Chatbot.objects.get(id=chatbot_id)
-    except Chatbot.DoesNotExist:
-        return JsonResponse({'error': 'Chatbot not found'}, status=404)
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id, owner=request.user)
     documents = chatbot.settings.get('documents', [])
     document = next((doc for doc in documents if doc['name'] == document_name), None)
 
@@ -182,22 +236,39 @@ def delete_document(request, chatbot_id, document_name):
             documents.remove(document)
             chatbot.settings['documents'] = documents
             chatbot.save()
-            return JsonResponse({'message': 'Document deleted successfully'})
+            return Response({'message': 'Document deleted successfully'})
         else:
-            return JsonResponse({'error': 'Failed to delete document'}, status=500)
+            return Response({'error': 'Failed to delete document'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     else:
-        return JsonResponse({'error': 'Document not found'}, status=404)
+        return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_documents(request, chatbot_id):
-    try:
-        chatbot = Chatbot.objects.get(id=chatbot_id)
-    except Chatbot.DoesNotExist:
-        return JsonResponse({'error': 'Chatbot not found'}, status=404)
+    chatbot = get_object_or_404(Chatbot, id=chatbot_id, owner=request.user)
     documents = chatbot.settings.get('documents', [])
 
     for doc in documents:
         doc['url'] = get_file_url(doc['path'])
 
-    return JsonResponse({'documents': documents})
+    return Response({'documents': documents})
+    
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def thread_detail(request, thread_id):
+    thread = get_object_or_404(Thread, id=thread_id, owner=request.user)
+
+    if request.method == 'GET':
+        serializer = ThreadSerializer(thread)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = ThreadSerializer(thread, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        thread.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

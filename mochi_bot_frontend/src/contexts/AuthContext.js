@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     try {
+      localStorage.removeItem('token'); // Remove any existing token
       const data = await apiLogin(username, password);
       localStorage.setItem('token', data.access); // Ensure this key matches the token in your response
       setIsAuthenticated(true);
