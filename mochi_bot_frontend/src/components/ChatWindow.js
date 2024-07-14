@@ -1,5 +1,3 @@
-// File: src/components/ChatWindow.js
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { createThread, sendMessage } from '../services/api';
 import { TextField, Button, Typography, Paper, CircularProgress, Snackbar } from '@mui/material';
@@ -31,48 +29,34 @@ function ChatWindow({ chatbot }) {
     createNewThread();
   }, [createNewThread]);
 
-  const handleSendMessage = async () => {
-    if (input.trim() && thread) {
-      const tempMessage = {
-        content: input,
-        timestamp: new Date().toISOString(),
-        role: 'user',
-        temporary: true,
-      };
-      setMessages((prevMessages) => {
-        const updatedMessages = [...prevMessages, tempMessage];
-        console.log('Temporary messages:', updatedMessages);
-        return updatedMessages;
-      });
-      setInput('');
-      setLoading(true);
-      setError(null);
+const handleSendMessage = async () => {
+  if (input.trim() && thread) {
+    const tempMessage = {
+      content: input,
+      timestamp: new Date().toISOString(),
+      role: 'user',
+      temporary: true,
+    };
+    setMessages((prevMessages) => [...prevMessages, tempMessage]);
+    setInput('');
+    setLoading(true);
+    setError(null);
 
-      try {
-        const response = await sendMessage(chatbot.id, thread.id, input);
-        console.log('Message sent, response received:', response);
-        setMessages((prevMessages) => {
-          const newMessages = [
-            ...prevMessages.filter((msg) => !msg.temporary),
-            response.user_message,
-            response.assistant_message,
-          ].filter(Boolean);
-          console.log('Updated messages after API response:', newMessages);
-          return newMessages;
-        });
-      } catch (error) {
-        console.error('Failed to send message:', error);
-        setError('Failed to send message. Please try again.');
-        setMessages((prevMessages) => {
-          const newMessages = prevMessages.filter((msg) => !msg.temporary);
-          console.log('Messages after error:', newMessages);
-          return newMessages;
-        });
-      } finally {
-        setLoading(false);
-      }
+    try {
+      const response = await sendMessage(chatbot.id, thread.id, input);
+      setMessages((prevMessages) => [
+        ...prevMessages.filter((msg) => !msg.temporary),
+        response.user_message,
+        response.assistant_message,
+      ]);
+    } catch (error) {
+      setError('Failed to send message. Please try again.');
+      setMessages((prevMessages) => prevMessages.filter((msg) => !msg.temporary));
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+};
 
   useEffect(() => {
     console.log('Messages state updated:', messages);
@@ -89,7 +73,7 @@ function ChatWindow({ chatbot }) {
         ) : (
           messages.map((message, index) => (
             message && message.role && (
-              <div key={index} style={{ marginBottom: '10px', padding: '5px', backgroundColor: message.role === 'user' ? '#e6f7ff' : '#f0f0f0', borderRadius: '5px' }}>
+              <div key={message.timestamp || index} style={{ marginBottom: '10px', padding: '5px', backgroundColor: message.role === 'user' ? '#e6f7ff' : '#f0f0f0', borderRadius: '5px' }}>
                 <strong>{message.role === 'user' ? 'You' : 'Bot'}:</strong> {message.content}
               </div>
             )

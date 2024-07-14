@@ -17,7 +17,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export const register = (username, email, password) =>
+export const register = (username, email, password) => 
   api.post('/register/', { username, email, password });
 
 export const login = async (username, password) => {
@@ -27,7 +27,7 @@ export const login = async (username, password) => {
     console.log('Login response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Login failed:', error.response);
+    console.error('Login failed:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -36,7 +36,7 @@ export const logout = () => api.post('/logout/');
 
 export const getChatbots = () => api.get('/chatbot/');
 
-export const createChatbot = (name, chatbot_type, desc = '') =>
+export const createChatbot = (name, chatbot_type, desc = '') => 
   api.post('/chatbot/', { name, chatbot_type, desc });
 
 export const deleteChatbot = (id) => api.delete(`/chatbot/${id}/`);
@@ -55,10 +55,10 @@ export const createThread = async (chatbotId) => {
   }
 };
 
-export const sendMessage = async (chatbot_id, thread_id, content) => {
+export const sendMessage = async (chatbotId, threadId, content) => {
   try {
-    console.log('Sending message:', { chatbot_id, thread_id, content });
-    const response = await api.post(`/chatbot/${chatbot_id}/${thread_id}/chat/`, { content });
+    console.log('Sending message:', { chatbotId, threadId, content });
+    const response = await api.post('/chat/', { chatbot_id: chatbotId, thread_id: threadId, content });
     console.log('sendMessage response:', response.data);
     return response.data;
   } catch (error) {
@@ -67,23 +67,23 @@ export const sendMessage = async (chatbot_id, thread_id, content) => {
   }
 };
 
-export const uploadDocument = (chatbot_id, file) => {
+export const uploadDocument = (chatbotId, file) => {
   const formData = new FormData();
   formData.append('file', file);
-  return api.post(`/chatbot/${chatbot_id}/upload_document/`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  return api.post(`/chatbot/${chatbotId}/upload_document/`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
 
-export const deleteDocument = (chatbot_id, document_name) =>
-  api.delete(`/chatbot/${chatbot_id}/delete_document/${document_name}/`);
+export const deleteDocument = (chatbotId, documentName) => 
+  api.delete(`/chatbot/${chatbotId}/delete_document/${documentName}/`);
 
-export const getDocuments = (chatbot_id) =>
-  api.get(`/chatbot/${chatbot_id}/documents/`);
+export const getDocuments = (chatbotId) => 
+  api.get(`/chatbot/${chatbotId}/documents/`);
 
-export const getChatLogs = async (chatbot_id) => {
+export const getChatLogs = async (chatbotId) => {
   try {
-    const response = await api.get(`/chatbot/${chatbot_id}/logs/`);
+    const response = await api.get(`/chatbot/${chatbotId}/logs/`);
     return response;
   } catch (error) {
     if (error.response && error.response.status === 404) {
@@ -94,11 +94,11 @@ export const getChatLogs = async (chatbot_id) => {
   }
 };
 
-export const getChatbotSettings = (chatbotId) =>
+export const getChatbotSettings = (chatbotId) => 
   api.get(`/chatbot/${chatbotId}/settings/`);
 
-export const updateChatbotSetting = (chatbotId, key, value) =>
+export const updateChatbotSetting = (chatbotId, key, value) => 
   api.put(`/chatbot/${chatbotId}/setting/${key}/`, { value });
 
-export const deleteChatbotSetting = (chatbotId, key) =>
+export const deleteChatbotSetting = (chatbotId, key) => 
   api.delete(`/chatbot/${chatbotId}/setting/${key}/`);

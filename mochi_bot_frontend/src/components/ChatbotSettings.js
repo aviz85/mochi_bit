@@ -25,23 +25,21 @@ function ChatbotSettings({ chatbot }) {
   const handleAddSetting = async () => {
     if (newKey && newValue) {
       try {
-        await updateChatbotSetting(chatbot.id, newKey, newValue);
+        const newSettings = [...settings, { key: newKey, value: newValue }];
+        setSettings(newSettings);
         setNewKey('');
         setNewValue('');
-        fetchSettings();
       } catch (error) {
         console.error('Failed to add setting:', error);
       }
     }
   };
 
-  const handleUpdateSetting = async (key, value) => {
-    try {
-      await updateChatbotSetting(chatbot.id, key, value);
-      fetchSettings();
-    } catch (error) {
-      console.error('Failed to update setting:', error);
-    }
+  const handleUpdateSetting = (key, value) => {
+    const updatedSettings = settings.map((setting) =>
+      setting.key === key ? { ...setting, value } : setting
+    );
+    setSettings(updatedSettings);
   };
 
   const handleDeleteSetting = async (key) => {
@@ -50,6 +48,17 @@ function ChatbotSettings({ chatbot }) {
       fetchSettings();
     } catch (error) {
       console.error('Failed to delete setting:', error);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      for (const setting of settings) {
+        await updateChatbotSetting(chatbot.id, setting.key, setting.value);
+      }
+      fetchSettings();
+    } catch (error) {
+      console.error('Failed to save settings:', error);
     }
   };
 
@@ -96,8 +105,11 @@ function ChatbotSettings({ chatbot }) {
         fullWidth
         margin="normal"
       />
-      <Button onClick={handleAddSetting} variant="contained" color="primary">
+      <Button onClick={handleAddSetting} variant="contained" color="primary" style={{ marginTop: '10px' }}>
         Add Setting
+      </Button>
+      <Button onClick={handleSaveSettings} variant="contained" color="secondary" style={{ marginTop: '10px', marginLeft: '10px' }}>
+        Save Settings
       </Button>
     </div>
   );

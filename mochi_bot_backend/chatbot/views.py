@@ -196,29 +196,52 @@ def create_thread(request):
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def send_message(request, chatbot_id, thread_id):
-    chatbot = get_object_or_404(Chatbot, id=chatbot_id)
-    thread = get_object_or_404(Thread, id=thread_id)
-    
-    user_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'user', 'content': request.data['content']})
-    if user_message_serializer.is_valid():
-        user_message = user_message_serializer.save()
-    else:
-        return Response(user_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    response = chatbot.generate_response(request.data['content'], thread_id)
-    
-    assistant_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'assistant', 'content': response})
-    if assistant_message_serializer.is_valid():
-        assistant_message = assistant_message_serializer.save()
-    else:
-        return Response(assistant_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+def send_message(request):
+    try:
+        # Log the incoming request data
+        logger.debug(f"Request data: {request.data}")
 
-    return Response({
-        'user_message': MessageSerializer(user_message).data,
-        'assistant_message': MessageSerializer(assistant_message).data
-    }, status=status.HTTP_200_OK)
+        # Extract necessary fields from the request data
+        chatbot_id = request.data.get('chatbot_id')
+        thread_id = request.data.get('thread_id')
+        content = request.data.get('content')
 
+        # Validate that all required fields are present
+        if not chatbot_id or not thread_id or not content:
+            return Response({'error': 'chatbot_id, thread_id, and content are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve the chatbot and thread objects
+        chatbot = get_object_or_404(Chatbot, id=chatbot_id)
+        thread = get_object_or_404(Thread, id=thread_id)
+
+        # Serialize and save the user message
+        user_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'user', 'content': content})
+        if user_message_serializer.is_valid():
+            user_message = user_message_serializer.save()
+        else:
+            logger.error(f"User message serializer errors: {user_message_serializer.errors}")
+            return Response(user_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate the response from the chatbot
+        response = chatbot.generate_response(content, thread_id)
+
+        # Serialize and save the assistant message
+        assistant_message_serializer = MessageSerializer(data={'thread': thread.id, 'role': 'assistant', 'content': response})
+        if assistant_message_serializer.is_valid():
+            assistant_message = assistant_message_serializer.save()
+        else:
+            logger.error(f"Assistant message serializer errors: {assistant_message_serializer.errors}")
+            return Response(assistant_message_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Return the user and assistant messages
+        return Response({
+            'user_message': MessageSerializer(user_message).data,
+            'assistant_message': MessageSerializer(assistant_message).data
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.exception("An error occurred in send_message")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_chatbot_types(request):
