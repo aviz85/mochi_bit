@@ -1,30 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Slider, Switch, Button, Typography, Grid, CircularProgress } from '@mui/material';
+import { TextField, Slider, Switch, Button, Typography, Grid, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { getChatbotSettings, updateChatbotSettings } from '../services/api';
 
 const ChatbotSettings = ({ chatbotId }) => {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (chatbotId) {
-        try {
-          setLoading(true);
-          const fetchedSettings = await getChatbotSettings(chatbotId);
-          setSettings(fetchedSettings);
-        } catch (err) {
-          setError('Failed to load settings');
-          console.error('Error fetching settings:', err);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchSettings();
   }, [chatbotId]);
+
+  const fetchSettings = async () => {
+    if (chatbotId) {
+      try {
+        setLoading(true);
+        const fetchedSettings = await getChatbotSettings(chatbotId);
+        setSettings(fetchedSettings);
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+        showToast('Failed to load settings', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const handleSettingChange = (key, value) => {
     setSettings(prevSettings => ({
@@ -40,15 +40,23 @@ const ChatbotSettings = ({ chatbotId }) => {
         acc[key] = setting.value;
         return acc;
       }, {});
-      const response = await updateChatbotSettings(chatbotId, updatedSettings);
-      setSettings(response);
-      setError(null);
+      await updateChatbotSettings(chatbotId, updatedSettings);
+      showToast('Settings saved successfully', 'success');
     } catch (err) {
-      setError('Failed to save settings');
       console.error('Error saving settings:', err);
+      showToast('Failed to save settings', 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const showToast = (message, severity) => {
+    setToast({ open: true, message, severity });
+  };
+
+  const handleCloseToast = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setToast({ ...toast, open: false });
   };
 
   const renderSettingInput = (key, setting) => {
@@ -82,8 +90,7 @@ const ChatbotSettings = ({ chatbotId }) => {
     }
   };
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Typography color="error">{error}</Typography>;
+  if (loading && Object.keys(settings).length === 0) return <CircularProgress />;
 
   return (
     <Grid container spacing={2}>
@@ -107,6 +114,11 @@ const ChatbotSettings = ({ chatbotId }) => {
           {loading ? <CircularProgress size={24} /> : 'Save Settings'}
         </Button>
       </Grid>
+      <Snackbar open={toast.open} autoHideDuration={6000} onClose={handleCloseToast}>
+        <Alert onClose={handleCloseToast} severity={toast.severity} sx={{ width: '100%' }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Grid>
   );
 };

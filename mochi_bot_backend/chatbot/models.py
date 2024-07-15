@@ -42,7 +42,7 @@ class ChatbotSettingsSchema(models.Model):
         elif schema_setting['type'] == 'string' and not isinstance(converted_value, str):
             raise ValidationError(f"Setting '{key}' must be a string")
         elif schema_setting['type'] == 'boolean' and not isinstance(converted_value, bool):
-            raise ValidationError(f"Setting '{key}' must be a boolean")
+            raise ValidationError(f"Setting '{key}' must be a boolean")   
             
 class ChatbotSettingsDict:
     def __init__(self, chatbot):
@@ -129,45 +129,7 @@ class ChatbotSetting(models.Model):
         schema = ChatbotSettingsSchema.objects.get(chatbot_type=self.chatbot.chatbot_type)
         self.value = schema.convert_value(self.key, new_value)
 
-class ChatbotSettingsSchema(models.Model):
-    chatbot_type = models.CharField(max_length=50, unique=True)
-    schema = models.JSONField()
 
-    def convert_value(self, key, value):
-        if key not in self.schema:
-            return value
-        
-        setting_type = self.schema[key]['type']
-        if setting_type == 'number':
-            try:
-                return float(value)
-            except (ValueError, TypeError):
-                return self.schema[key]['default']
-        elif setting_type == 'string':
-            return str(value)
-        elif setting_type == 'boolean':
-            return bool(value)
-        return value
-
-    def validate_setting(self, key, value):
-        if key not in self.schema:
-            raise ValidationError(f"Unknown setting '{key}' for chatbot type '{self.chatbot_type}'")
-        
-        schema_setting = self.schema[key]
-        converted_value = self.convert_value(key, value)
-        
-        if schema_setting['type'] == 'number':
-            if not isinstance(converted_value, (int, float)):
-                raise ValidationError(f"Setting '{key}' must be a number")
-            if 'minimum' in schema_setting and converted_value < schema_setting['minimum']:
-                raise ValidationError(f"Setting '{key}' must be at least {schema_setting['minimum']}")
-            if 'maximum' in schema_setting and converted_value > schema_setting['maximum']:
-                raise ValidationError(f"Setting '{key}' must be at most {schema_setting['maximum']}")
-        elif schema_setting['type'] == 'string' and not isinstance(converted_value, str):
-            raise ValidationError(f"Setting '{key}' must be a string")
-        elif schema_setting['type'] == 'boolean' and not isinstance(converted_value, bool):
-            raise ValidationError(f"Setting '{key}' must be a boolean")
-        
 class Thread(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     chatbot = models.ForeignKey(Chatbot, on_delete=models.CASCADE)

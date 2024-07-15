@@ -58,32 +58,38 @@ def get_chat_logs(request, chatbot_id):
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def chatbot_settings(request, chatbot_id):
+    logger.debug(f"Accessing chatbot settings for chatbot_id: {chatbot_id}")
+    
     chatbot = get_object_or_404(Chatbot, id=chatbot_id)
-
-    # Debugging prints
-    print(f"Request user: {request.user}")
-    print(f"Chatbot owner: {chatbot.owner}")
-    print(f"Is admin: {request.user.is_staff}")
-    print(f"Request headers: {request.headers}")
-
-    # Check if the request user is the owner of the chatbot or an admin
+    logger.debug(f"Chatbot found: {chatbot.name}, type: {chatbot.chatbot_type}")
+    
     if not (request.user == chatbot.owner or request.user.is_staff):
+        logger.warning(f"Permission denied for user {request.user.username}")
         return Response({'error': 'Permission denied'}, status=403)
-
-    schema = ChatbotSettingsSchema.objects.get(chatbot_type=chatbot.chatbot_type)
-
+    
+    try:
+        schema = ChatbotSettingsSchema.objects.get(chatbot_type=chatbot.chatbot_type)
+        logger.debug(f"Schema found for chatbot type: {chatbot.chatbot_type}")
+        logger.debug(f"Schema content: {schema.schema}")
+    except ChatbotSettingsSchema.DoesNotExist:
+        logger.error(f"ChatbotSettingsSchema not found for type: {chatbot.chatbot_type}")
+        return Response({'error': f'Settings schema not found for chatbot type: {chatbot.chatbot_type}'}, status=404)
+    
     if request.method == "GET":
         settings = {}
         for key, setting_schema in schema.schema.items():
-            setting_value = chatbot.settings.get(key, setting_schema['default'])
+            logger.debug(f"Processing setting: {key}, schema: {setting_schema}")
+            default_value = setting_schema.get('default', None)
+            setting_value = chatbot.settings.get(key, default_value)
             settings[key] = {
                 'value': setting_value,
                 'display_name': setting_schema.get('display_name', key),
                 'description': setting_schema.get('description', ''),
-                'type': setting_schema['type'],
-                'default_value': setting_schema['default'],
+                'type': setting_schema.get('type', 'string'),  # Default to string if not specified
+                'default_value': default_value,
                 'required': setting_schema.get('required', False)
             }
+        logger.debug(f"Returning settings: {settings}")
         return Response(settings)
 
     elif request.method == "PUT":
@@ -91,29 +97,20 @@ def chatbot_settings(request, chatbot_id):
             settings_data = json.loads(request.body)
             for key, value in settings_data.items():
                 if key not in schema.schema:
-                    raise ValidationError(f"Invalid setting: {key}")
-                schema.validate_setting(key, value)
+                    return Response({'error': f'Invalid setting: {key}'}, status=400)
+                setting_schema = schema.schema[key]
+                # Validate the setting here if needed
                 chatbot.settings[key] = value
-            chatbot.save()  # Save the updated settings
-            
-            # Return the full updated settings
-            updated_settings = {}
-            for key, setting_schema in schema.schema.items():
-                setting_value = chatbot.settings.get(key, setting_schema['default'])
-                updated_settings[key] = {
-                    'value': setting_value,
-                    'display_name': setting_schema.get('display_name', key),
-                    'description': setting_schema.get('description', ''),
-                    'type': setting_schema['type'],
-                    'default_value': setting_schema['default'],
-                    'required': setting_schema.get('required', False)
-                }
-            return Response(updated_settings)
+            chatbot.save()
+            return Response({'message': 'Settings updated successfully'})
         except json.JSONDecodeError:
             return Response({'error': 'Invalid JSON'}, status=400)
-        except ValidationError as e:
-            return Response({'error': str(e)}, status=400)
-            
+        except Exception as e:
+            logger.error(f"Error updating settings: {str(e)}")
+            return Response({'error': 'An error occurred while updating settings'}, status=500)
+
+    return Response({'error': 'Method not allowed'}, status=405)
+    
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):

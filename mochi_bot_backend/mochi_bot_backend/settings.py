@@ -7,6 +7,20 @@ logging.basicConfig(level=logging.DEBUG)
 
 load_dotenv()
 
+DEBUG = True
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# URL to use when referring to static files
+STATIC_URL = '/static/'
+
+# The absolute path to the directory where static files should be collected
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Additional directories to look for static files
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 # Define BASE_DIR
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -155,19 +169,16 @@ LOGGING = {
     },
 }
 
-# CORS settings
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000'
 ]
 
-# CSRF settings
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',  # Allow localhost:3000
-    'http://127.0.0.1:3000',  # Allow 127.0.0.1:3000 if you're using it
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
 ]
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
