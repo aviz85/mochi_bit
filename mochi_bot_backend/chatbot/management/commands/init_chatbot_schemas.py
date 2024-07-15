@@ -1,50 +1,36 @@
-# management/commands/init_chatbot_schemas.py
-
 from django.core.management.base import BaseCommand
 from chatbot.models import ChatbotSettingsSchema
+from django.conf import settings
 
 class Command(BaseCommand):
     help = 'Initialize chatbot settings schemas'
 
     def handle(self, *args, **options):
-        schemas = [
-            {
-                'chatbot_type': 'echo',
-                'schema': {
-                    'echo_prefix': {
-                        'type': 'string',
-                        'default_value': 'Echo: ',
-                        'display_name': 'Echo Prefix',
-                        'description': 'Prefix to add before echoing the message',
-                        'required': True
-                    }
-                }
-            },
-            {
-                'chatbot_type': 'claudie',
-                'schema': {
-                    'character': {
-                        'type': 'string',
-                        'default_value': 'You are a helpful AI assistant.',
-                        'display_name': 'Character Description',
-                        'description': 'The character or system prompt for the chatbot',
-                        'required': True
-                    },
-                    'temperature': {
-                        'type': 'number',
-                        'default_value': 1.0,
-                        'display_name': 'Temperature',
-                        'description': 'Controls randomness in the output. Higher values make the output more random.',
-                        'required': False
-                    }
-                }
-            }
-        ]
+        chatbot_types = getattr(settings, 'CHATBOT_TYPES', {})
 
-        for schema_data in schemas:
+        for chatbot_type, config in chatbot_types.items():
+            schema = {}
+            for setting_name, setting_config in config['settings'].items():
+                schema[setting_name] = {
+                    'type': setting_config['type'],
+                    'default_value': setting_config['default'],
+                    'display_name': setting_config.get('display_name', setting_name.replace('_', ' ').title()),
+                    'description': setting_config['description'],
+                    'required': setting_config.get('required', False)
+                }
+                
+                # Add min and max if they exist for number type
+                if setting_config['type'] == 'number':
+                    if 'minimum' in setting_config:
+                        schema[setting_name]['minimum'] = setting_config['minimum']
+                    if 'maximum' in setting_config:
+                        schema[setting_name]['maximum'] = setting_config['maximum']
+
             ChatbotSettingsSchema.objects.update_or_create(
-                chatbot_type=schema_data['chatbot_type'],
-                defaults={'schema': schema_data['schema']}
+                chatbot_type=chatbot_type,
+                defaults={'schema': schema}
             )
 
-        self.stdout.write(self.style.SUCCESS('Successfully initialized chatbot settings schemas'))
+            self.stdout.write(self.style.SUCCESS(f'Successfully initialized/updated schema for {chatbot_type}'))
+
+        self.stdout.write(self.style.SUCCESS('All chatbot settings schemas have been initialized/updated.'))
