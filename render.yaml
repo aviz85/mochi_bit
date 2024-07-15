@@ -2,7 +2,7 @@ services:
   - type: web
     name: mochi-bot-backend
     runtime: python
-    plan: standard  # Change to the desired paid plan
+    plan: starter  # Change to the desired paid plan
     region: frankfurt  # Choose your preferred region
     rootDir: mochi_bot_backend  # Specify the subfolder containing the backend
     buildCommand: |
@@ -31,7 +31,7 @@ databases:
   - name: mochi-bot-db
     postgresMajorVersion: "16"  # Specify the PostgreSQL version
     region: frankfurt  # Specify the deployment region
-    plan: pro  # Specify the desired plan
+    plan: starter  # Specify the desired plan
     databaseName: mochi_bot_db  # Specify the database name
     user: mochi_user  # Specify the database user
     ipAllowList:  # Define IP allow list
