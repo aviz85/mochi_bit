@@ -21,11 +21,9 @@ services:
         value: .render.com
       - key: DATABASE_URL
         sync: false
-      - key: ADDITIONAL_ENV_VAR  # Add any additional environment variables you might need
-        sync: false
 
 databases:
   - name: mochi-bot-db
     plan: standard  # Change to the desired paid plan
-    postgres:
-      version: 12
+    provider: postgres
+    version: 12
