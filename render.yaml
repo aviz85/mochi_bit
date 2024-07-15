@@ -39,8 +39,6 @@ databases:
         description: office
       - source: 198.51.100.1
         description: home
-    readReplicas:  # Add a read replica
-      - name: mochi-bot-db-replica
 
 envVarGroups:
   - name: my-env-group
