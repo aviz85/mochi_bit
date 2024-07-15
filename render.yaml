@@ -47,5 +47,3 @@ envVarGroups:
         value: https://api.example.com
       - key: APP_SECRET
         generateValue: true
-      - key: STRIPE_API_KEY
-        sync: false
