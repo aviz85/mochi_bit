@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: mochi-bot-backend
+    env: python
+    plan: standard  # Change to the desired paid plan
+    buildCommand: |
+      pip install -r mochi_bot_backend/requirements.txt
+      npm install --prefix mochi_bot_frontend && npm run build --prefix mochi_bot_frontend
+      cp -r mochi_bot_frontend/build/* mochi_bot_backend/staticfiles/
+      python mochi_bot_backend/manage.py collectstatic --noinput
+      python mochi_bot_backend/manage.py migrate
+    startCommand: gunicorn mochi_bot_backend.wsgi --log-file -
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DJANGO_DEBUG
+        sync: false
+        value: false  # Set to true if you want to enable debug mode, usually false in production
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+        value: .render.com
+      - key: DATABASE_URL
+        sync: false
+      - key: ADDITIONAL_ENV_VAR  # Add any additional environment variables you might need
+        sync: false
+
+databases:
+  - name: mochi-bot-db
+    plan: standard  # Change to the desired paid plan
+    postgres:
+      version: 12
