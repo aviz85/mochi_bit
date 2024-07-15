@@ -3,15 +3,18 @@ services:
     name: mochi-bot-backend
     runtime: python
     plan: standard  # Change to the desired paid plan
-    region: frankfurt # Choose your preferred region
+    region: frankfurt  # Choose your preferred region
+    rootDir: mochi_bot_backend  # Specify the subfolder containing the backend
     buildCommand: |
-      pip install -r mochi_bot_backend/requirements.txt
-      npm install --prefix mochi_bot_frontend && npm run build --prefix mochi_bot_frontend
-      cp -r mochi_bot_frontend/build/* mochi_bot_backend/staticfiles/
-      python mochi_bot_backend/manage.py collectstatic --noinput
-      python mochi_bot_backend/manage.py migrate
-    startCommand: gunicorn mochi_bot_backend.wsgi --log-file -
+      pip install -r requirements.txt
+      npm install --prefix ../mochi_bot_frontend && npm run build --prefix ../mochi_bot_frontend
+      cp -r ../mochi_bot_frontend/build/* staticfiles/
+      python manage.py collectstatic --noinput
+      python manage.py migrate
+    startCommand: cd mochi_bot_backend && gunicorn mochi_bot_backend.wsgi:application --log-file -
     envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: mochi_bot_backend.settings
       - key: DJANGO_SECRET_KEY
         sync: false
       - key: DJANGO_DEBUG
@@ -27,7 +30,7 @@ databases:
   - name: mochi-bot-db
     postgresMajorVersion: "16"  # Specify the PostgreSQL version
     region: frankfurt  # Specify the deployment region
-    plan: standard  # Specify the desired plan
+    plan: pro  # Specify the desired plan
     databaseName: mochi_bot_db  # Specify the database name
     user: mochi_user  # Specify the database user
     ipAllowList:  # Define IP allow list
