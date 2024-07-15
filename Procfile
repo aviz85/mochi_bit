@@ -1,1 +1,1 @@
-web: ./start.sh
+web: gunicorn mochi_bot_backend.wsgi --log-file -
