@@ -1,8 +1,9 @@
 services:
   - type: web
     name: mochi-bot-backend
-    env: python
+    runtime: python
     plan: standard  # Change to the desired paid plan
+    region: frankfurt # Choose your preferred region
     buildCommand: |
       pip install -r mochi_bot_backend/requirements.txt
       npm install --prefix mochi_bot_frontend && npm run build --prefix mochi_bot_frontend
@@ -20,10 +21,31 @@ services:
         sync: false
         value: .render.com
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: mochi-bot-db
+          property: connectionString
 
 databases:
   - name: mochi-bot-db
-    plan: standard  # Change to the desired paid plan
-    provider: postgres
-    version: 12
+    postgresMajorVersion: "16"  # Specify the PostgreSQL version
+    region: frankfurt  # Specify the deployment region
+    plan: pro  # Specify the desired plan
+    databaseName: mochi_bot_db  # Specify the database name
+    user: mochi_user  # Specify the database user
+    ipAllowList:  # Define IP allow list
+      - source: 203.0.113.4/30
+        description: office
+      - source: 198.51.100.1
+        description: home
+    readReplicas:  # Add a read replica
+      - name: mochi-bot-db-replica
+
+envVarGroups:
+  - name: my-env-group
+    envVars:
+      - key: API_BASE_URL
+        value: https://api.example.com
+      - key: APP_SECRET
+        generateValue: true
+      - key: STRIPE_API_KEY
+        sync: false
