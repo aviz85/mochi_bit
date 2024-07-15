@@ -15,10 +15,8 @@ services:
       - key: DJANGO_SECRET_KEY
         sync: false
       - key: DJANGO_DEBUG
-        sync: false
         value: false  # Set to true if you want to enable debug mode, usually false in production
       - key: DJANGO_ALLOWED_HOSTS
-        sync: false
         value: .render.com
       - key: DATABASE_URL
         fromDatabase:
@@ -29,7 +27,7 @@ databases:
   - name: mochi-bot-db
     postgresMajorVersion: "16"  # Specify the PostgreSQL version
     region: frankfurt  # Specify the deployment region
-    plan: pro  # Specify the desired plan
+    plan: standard  # Specify the desired plan
     databaseName: mochi_bot_db  # Specify the database name
     user: mochi_user  # Specify the database user
     ipAllowList:  # Define IP allow list
